@@ -21,35 +21,42 @@ print('***************************** DATA READ COMPLETE ************************
 #sampling the data to the console
 print(data.head())
 
-#outputing only for newjersey
-data_nj = data.query('state == "New Jersey"')
-print('***************************** NJ ONLY FILTER COMPLETE *****************************')
 
-#grouping by county, year and party to extract count of candidate votes
-print(data_nj.groupby(['state','year','party','candidate']).agg(
+#********************************************* EXTRAPOLATING THE ABOVE LOGIC ON THE ENTIRE DATASET ********************************************
+
+#grouping by state, year, party and candidate to extract count of candidate votes per state. this will sum the votes across all countys
+data_sum = pd.DataFrame(data.groupby(['state','year','party','candidate']).agg(
         votes_by_party = pd.NamedAgg(column = 'candidatevotes', aggfunc = sum)
-).sort_index)
+)).reset_index()
 
-data_nj_sum = pd.DataFrame(data_nj.groupby(['state','year','party','candidate']).agg(
-        votes_by_party = pd.NamedAgg(column = 'candidatevotes', aggfunc = sum)
-))
+#adding a new column called UNIQUE_KEY. This column will be used to join with another dataframe
+data_sum['Unique_Key'] = data_sum['state'].map(str).str.strip()+\
+                            data_sum['year'].map(str).str.strip()+\
+                            data_sum['votes_by_party'].map(str).str.strip()
+print(data_sum.head())
 
+#Building a new dataframe to group by state and year and aggregating to show max votes
 print('***************************** FINDING OUT WHO WON IN NJ *****************************')
-#finding out who won in nj
-print(data_nj.groupby(['state','year']).agg(
-        winning_votes = pd.NamedAgg(column ='candidatevotes', aggfunc = max)
-).reset_index())
+data_winner = data_sum.groupby(['state','year']).agg(
+        {'votes_by_party':'max'}
+).reset_index()
 
-data_nj_winner = data_nj.groupby(['state','year']).agg(
-        winning_votes = pd.NamedAgg(column ='candidatevotes', aggfunc = max))
+#printing out the shape of the dataframe
+print(data_winner.shape)
 
+#adding new column called UNIQUE_KEY. This column will be used to join with another dataframe
+data_winner['Unique_Key'] = data_winner['state'].map(str).str.strip()+\
+                               data_winner['year'].map(str).str.strip()+\
+                               data_winner['votes_by_party'].map(str).str.strip()
+
+#joining the "data_nj_sum" and the "data_nj_winner" dataframes to be able to assign the party name to the winner of the year's election
+data_joined = pd.merge(data_winner, data_sum[['party','candidate','Unique_Key']], on = 'Unique_Key', how = 'left')
+print(data_joined.head(1))
 
 print('***************************** PRINTING THE DATA FRAME FOR NJ *****************************')
-print(data_nj_sum)
+print(data_joined.head())
 
 
 print('***************************** WRITING TO CSV *****************************')
 #using the reset_index() method to allow all the columns to be printed in to the csv
-data_nj_sum.reset_index().to_csv('/Users/aakarsh.rajagopalan/Personal documents/Datasets for tableau/Tableau project dataset/data_nj_countByParty.csv',  index = False)
-
-data_nj_winner.reset_index().to_csv('/Users/aakarsh.rajagopalan/Personal documents/Datasets for tableau/Tableau project dataset/Winner_in_nj.csv',  index = False)
+data_joined.reset_index().to_csv('/Users/aakarsh.rajagopalan/Personal documents/Datasets for tableau/Tableau project dataset/data_count_By_Party.csv',  index = False)
